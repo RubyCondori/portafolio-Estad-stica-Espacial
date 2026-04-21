@@ -1,0 +1,61 @@
+# .gitignore - Archivos y carpetas a ignorar en Git
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+*.log
+
+# Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.sublime-project
+.sublime-workspace
+
+# Node.js (si usas npm)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Python (si usas Python)
+__pycache__/
+*.py[cod]
+*$py.class
+.python-version
+venv/
+env/
+
+# IDEs
+*.iml
+
+# Archivos temporales
+*.tmp
+*.temp
+*-backup
+*-copy
+
+# OS
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Compilados/Build
+*.o
+*.obj
+*.exe
+*.dll
+
+# Archivos personales (NO subar!)
+notas-privadas.txt
+secrets.txt
+token.txt
+contraseña.txt
+
+# Archivos de respaldo
+*.bak
+*.backup
+*.old

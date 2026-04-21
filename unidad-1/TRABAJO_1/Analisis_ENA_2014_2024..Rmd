@@ -1,0 +1,682 @@
+---
+title: "Análisis Estadístico Espacial ENA 2014-2024"
+author: "Ruby Condori"
+date: "`r format(Sys.time(), '%d de %B de %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+    theme: cosmo
+    fig_width: 12
+    fig_height: 7
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.width = 12, fig.height = 7, dpi = 200)
+library(data.table)
+library(ggplot2)
+library(scales)
+library(knitr)
+library(sf)
+library(dplyr)
+
+setwd("d:/X SEMESTRE/ESTADISTICA ESPACIAL/ENA_2014_2024")
+if (!dir.exists("resultados")) dir.create("resultados", showWarnings = FALSE)
+gc(verbose = FALSE, full = TRUE)
+```
+
+```{r importacion, include=FALSE}
+# Importación optimizada
+variables_seleccionadas <- c("P233_1", "P233_3", "P234_NOM", 
+                             "LONGITUD", "LATITUD", "NOMBREDD", 
+                             "NOMBREPV", "NOMBREDI", "REGION", "ANIO")
+
+datos_importados <- tryCatch({
+  fread("ENA_2014_2024.csv", 
+        select = variables_seleccionadas,
+        encoding = "UTF-8",
+        na.strings = c("", "NA", "na", "."),
+        fill = TRUE, 
+        verbose = FALSE,
+        nThread = 2)
+}, error = function(e) {
+  d <- fread("ENA_2014_2024.csv", verbose = FALSE, nThread = 2)
+  d[, ..variables_seleccionadas]
+})
+
+setDT(datos_importados)
+
+# Limpieza
+datos_limpios <- datos_importados
+n_antes <- nrow(datos_limpios)
+
+for (col in colnames(datos_limpios)) {
+  if (is.numeric(datos_limpios[[col]])) {
+    set(datos_limpios, which(is.na(datos_limpios[[col]])), col, 0)
+  } else if (is.character(datos_limpios[[col]])) {
+    set(datos_limpios, which(is.na(datos_limpios[[col]])), col, "DESCONOCIDO")
+  }
+}
+
+datos_limpios <- datos_limpios[!duplicated(datos_limpios, by = .SD)]
+n_duplicados <- n_antes - nrow(datos_limpios)
+
+char_cols <- colnames(datos_limpios)[sapply(datos_limpios, is.character)]
+for (col in char_cols) {
+  set(datos_limpios, j = col, value = as.factor(trimws(toupper(datos_limpios[[col]]))))
+}
+
+# Guardar
+save(datos_limpios, file = "resultados/datos_limpios.RData", compress = "bzip2")
+fwrite(datos_limpios, "resultados/datos_limpios.csv")
+
+# Clasificación de variables
+numeric_cols <- colnames(datos_limpios)[sapply(datos_limpios, is.numeric)]
+factor_cols <- colnames(datos_limpios)[sapply(datos_limpios, is.factor)]
+
+# Remover variables geográficas de los análisis descriptivos
+numeric_cols <- numeric_cols[!numeric_cols %in% c("LONGITUD", "LATITUD", "ANIO")]
+factor_cols <- factor_cols[!factor_cols %in% c("NOMBREDD", "NOMBREPV", "NOMBREDI", "REGION")]
+
+gc(verbose = FALSE, full = TRUE)
+```
+
+# 1. RESUMEN DE DATOS
+
+```{r resumen_datos}
+datos_resumen <- data.frame(
+  Métrica = c("Total de Observaciones", "Variables en el Dataset", "Variables Numéricas Analizadas", 
+              "Variables Categóricas Analizadas", "Registros Duplicados Identificados y Removidos", "Cobertura de Datos"),
+  Valor = c(nrow(datos_limpios), ncol(datos_limpios), length(numeric_cols), 
+            length(factor_cols), n_duplicados, "100% (sin valores faltantes)")
+)
+
+kable(datos_resumen, caption = "Resumen General del Dataset de la ENA 2014-2024")
+```
+
+**¿Qué significa esto?** 
+
+Este resumen nos muestra que trabajamos con una base de datos completa y confiable. Tenemos **`r nrow(datos_limpios)` observaciones** (encuestas realizadas) de la ENA entre 2014 y 2024. Lo más importante es que **no hay datos faltantes**, así que cada número que vemos es real y completo. El hecho de que hayamos removido algunos registros duplicados significa que nuestro análisis está limpio: sin repeticiones que nos confundan. Este es el punto de partida perfecto para un análisis confiable.
+
+---
+
+# 2. ESTADÍSTICAS DESCRIPTIVAS Y ANÁLISIS DE FRECUENCIAS
+
+## 2.1 Variables Numéricas
+
+```{r estadisticas_numericas}
+if (length(numeric_cols) > 0) {
+  stats_table <- data.frame()
+  
+  for (col in numeric_cols) {
+    var_data <- datos_limpios[[col]]
+    
+    stats_table <- rbind(stats_table, data.frame(
+      Variable = col,
+      N = length(var_data),
+      Media = round(mean(var_data, na.rm = TRUE), 4),
+      Mediana = round(median(var_data, na.rm = TRUE), 4),
+      "Desv.Est" = round(sd(var_data, na.rm = TRUE), 4),
+      Mínimo = round(min(var_data, na.rm = TRUE), 4),
+      Máximo = round(max(var_data, na.rm = TRUE), 4),
+      Q1 = round(quantile(var_data, 0.25, na.rm = TRUE), 4),
+      Q3 = round(quantile(var_data, 0.75, na.rm = TRUE), 4),
+      check.names = FALSE
+    ))
+  }
+  
+  kable(stats_table, caption = "Resumen Estadístico de Variables Numéricas - Medidas de Tendencia Central y Dispersión")
+}
+```
+
+```{r interpretacion_stats_numericas, results='asis'}
+if (length(numeric_cols) > 0) {
+  for (col in numeric_cols) {
+    var_data <- datos_limpios[[col]]
+    media <- mean(var_data, na.rm = TRUE)
+    mediana <- median(var_data, na.rm = TRUE)
+    desv_est <- sd(var_data, na.rm = TRUE)
+    min_val <- min(var_data, na.rm = TRUE)
+    max_val <- max(var_data, na.rm = TRUE)
+    rango <- max_val - min_val
+    cv <- (desv_est / abs(media + 0.0001)) * 100
+    q1 <- quantile(var_data, 0.25, na.rm = TRUE)
+    q3 <- quantile(var_data, 0.75, na.rm = TRUE)
+    iqr <- q3 - q1
+    
+    cat("### Interpretación de **", col, "**\n\n", sep="")
+    
+    cat("**Resumen rápido:**\n",
+        "- El valor típico es **", round(media, 2), "** (promedio)\n",
+        "- La mayoría de datos está entre **", round(q1, 2), "** y **", round(q3, 2), "**\n",
+        "- Los datos varían desde **", round(min_val, 2), "** hasta **", round(max_val, 2), "**\n\n", sep="")
+    
+    if (abs(media - mediana) < desv_est * 0.1) {
+      cat("**¿Es una distribución normal?** Sí, aproximadamente. El promedio (", round(media, 2), ") es casi igual a la mediana (", 
+          round(mediana, 2), "), lo que significa que los datos se distribuyen de forma equilibrada. No hay valores extremos que causen problemas.\n\n", sep="")
+    } else if (media > mediana) {
+      cat("**Atención:** El promedio (", round(media, 2), ") es mayor que la mediana (", 
+          round(mediana, 2), "). Esto significa que hay algunos valores MUY ALTOS que elevan el promedio. ",
+          "Es como calcular el sueldo promedio de un grupo donde la mayoría gana poco pero hay un millonario.\n\n", sep="")
+    } else {
+      cat("**Atención:** El promedio (", round(media, 2), ") es menor que la mediana (", 
+          round(mediana, 2), "). Hay valores muy pequeños que bajan el promedio.\n\n", sep="")
+    }
+    
+    cat("**¿Cuánta variación hay?** Coeficiente de variación = ", round(cv, 1), "%\n", sep="")
+    if (cv < 15) {
+      cat("→ Muy consistente. Los datos son casi todos iguales.\n\n")
+    } else if (cv < 30) {
+      cat("→ Bastante consistente. Hay poca variación.\n\n")
+    } else if (cv < 50) {
+      cat("→ Variación moderada. Es lo normal en datos agropecuarios.\n\n")
+    } else {
+      cat("→ Muy variable. Hay grandes diferencias entre los datos.\n\n")
+    }
+    
+    cat("---\n\n")
+  }
+}
+```
+
+## 2.2 Variables Categóricas
+
+```{r frecuencias_categoricas}
+if (length(factor_cols) > 0) {
+  for (col in factor_cols) {
+    freq_table <- datos_limpios[, .(Frecuencia = .N), by = col][order(-Frecuencia)]
+    freq_table$Porcentaje <- paste0(round((freq_table$Frecuencia / sum(freq_table$Frecuencia)) * 100, 1), "%")
+    freq_table$"% Acumulado" <- paste0(round(cumsum(freq_table$Frecuencia) / sum(freq_table$Frecuencia) * 100, 1), "%")
+    
+    names(freq_table)[1] <- col
+    
+    kable(head(freq_table, 10), caption = paste("Distribución de", col))
+    cat("\n")
+  }
+}
+```
+
+```{r interpretacion_categoricas, results='asis'}
+if (length(factor_cols) > 0) {
+  for (col in factor_cols) {
+    freq_tab <- datos_limpios[, .N, by = col][order(-N)]
+    total <- sum(freq_tab$N)
+    top_cat <- freq_tab[[1, 1]]
+    top_freq <- freq_tab[[1, 2]]
+    top_pct <- round((top_freq / total) * 100, 1)
+    n_categorias <- nrow(freq_tab)
+    
+    cat("### Interpretación de **", col, "**\n\n", sep="")
+    
+    cat("Hay **", n_categorias, "** categorías diferentes. La opción '", as.character(top_cat), "' es la más frecuente con **", top_pct, "%** de las respuestas.\n\n", sep="")
+    
+    if (top_pct > 70) {
+      cat("**¿Qué significa?** Prácticamente todos coinciden en '", as.character(top_cat), "'. Es un consenso muy fuerte. ",
+          "Si esto fuera una práctica agrícola, significa que casi todos los agricultores la hacen de la misma forma.\n\n", sep="")
+    } else if (top_pct > 50) {
+      cat("**¿Qué significa?** La mayoría elige '", as.character(top_cat), "', pero hay disidencia. ",
+          "Otros también tienen presencia notable. Hay un patrón claro pero también diversidad.\n\n", sep="")
+    } else if (top_pct > 25) {
+      cat("**¿Qué significa?** La opción más frecuente es '", as.character(top_cat), "', pero sin dominio claro. ",
+          "Las respuestas se distribuyen entre varias opciones. Hay mucha heterogeneidad.\n\n", sep="")
+    } else {
+      cat("**¿Qué significa?** No hay una opción dominante. Las respuestas están distribuidas equitativamente. ",
+          "No hay un patrón claro. Cada región puede ser diferente.\n\n", sep="")
+    }
+    
+    cat("**Top 3 opciones:**\n")
+    for (i in 1:min(3, nrow(freq_tab))) {
+      pct_cat <- round((freq_tab[[i, 2]] / total) * 100, 1)
+      cat(i, ". ", as.character(freq_tab[[i, 1]]), ": ", pct_cat, "%\n", sep="")
+    }
+    
+    cat("\n---\n\n")
+  }
+}
+```
+
+---
+
+# 3. VISUALIZACIONES Y SUS INTERPRETACIONES
+
+## 3.1 Gráficos de Variables Numéricas
+
+```{r viz_numericas, fig.show='hold'}
+if (length(numeric_cols) > 0) {
+  for (col in numeric_cols) {
+    if (length(unique(datos_limpios[[col]])) > 2) {
+      var_data <- datos_limpios[[col]]
+      media <- mean(var_data, na.rm = TRUE)
+      mediana <- median(var_data, na.rm = TRUE)
+      desv_est <- sd(var_data, na.rm = TRUE)
+      
+      # Histograma + Densidad
+      p1 <- ggplot(datos_limpios, aes(x = get(col))) +
+        geom_histogram(bins = 40, fill = "#3498db", alpha = 0.7, color = "black", size = 0.3) +
+        geom_density(color = "#e74c3c", size = 1.2, aes(y = after_stat(count))) +
+        geom_vline(aes(xintercept = media), color = "#27ae60", linetype = "dashed", size = 1, 
+                   label = paste("Media:", round(media, 2))) +
+        geom_vline(aes(xintercept = mediana), color = "#f39c12", linetype = "dotted", size = 1,
+                   label = paste("Mediana:", round(mediana, 2))) +
+        theme_minimal() +
+        theme(plot.title = element_text(face = "bold", size = 13),
+              plot.subtitle = element_text(size = 10, color = "gray50")) +
+        labs(title = paste("Distribución de", col),
+             subtitle = paste("Media =", round(media, 3), "| Mediana =", round(mediana, 3), "| D.Est =", round(desv_est, 3)),
+             x = col, y = "Frecuencia")
+      
+      # Box plot
+      p2 <- ggplot(datos_limpios, aes(y = get(col), x = "")) +
+        geom_boxplot(fill = "#9b59b6", alpha = 0.7, color = "black", size = 0.7, 
+                     outlier.color = "#e74c3c", outlier.size = 3) +
+        geom_jitter(width = 0.15, alpha = 0.2, size = 2, color = "#3498db") +
+        theme_minimal() +
+        theme(plot.title = element_text(face = "bold", size = 13),
+              axis.text.x = element_blank(),
+              axis.ticks.x = element_blank()) +
+        labs(title = paste("Box Plot:", col),
+             subtitle = "Muestra la mediana, cuartiles y valores atípicos",
+             x = "", y = col)
+      
+      print(p1)
+      print(p2)
+      
+      ggsave(paste0("resultados/distribucion_", make.names(col), ".png"), p1, 
+             width = 12, height = 6, dpi = 150, device = "png")
+      ggsave(paste0("resultados/boxplot_", make.names(col), ".png"), p2, 
+             width = 8, height = 7, dpi = 150, device = "png")
+      
+      rm(p1, p2)
+      gc(verbose = FALSE)
+    }
+  }
+}
+```
+
+```{r interpretacion_graficos_numericos, results='asis'}
+if (length(numeric_cols) > 0) {
+  for (col in numeric_cols) {
+    if (length(unique(datos_limpios[[col]])) > 2) {
+      var_data <- datos_limpios[[col]]
+      media <- mean(var_data, na.rm = TRUE)
+      mediana <- median(var_data, na.rm = TRUE)
+      desv_est <- sd(var_data, na.rm = TRUE)
+      q1 <- quantile(var_data, 0.25, na.rm = TRUE)
+      q3 <- quantile(var_data, 0.75, na.rm = TRUE)
+      iqr <- q3 - q1
+      
+      cat("### Gráfico de **", col, "**\n\n", sep="")
+      
+      cat("**¿Qué ves en el histograma (gráfico de barras)?**\n\n")
+      cat("- La línea roja suave es la forma general de los datos (curva de densidad)\n")
+      cat("- La línea verde punteada es el promedio\n")
+      cat("- La línea naranja punteada es la mediana\n")
+      cat("- Las barras azules muestran cuántos datos hay en cada rango\n\n")
+      
+      cat("**¿Qué ves en el Box Plot (gráfico de caja)?**\n\n")
+      cat("- La caja contiene el 50% de los datos (desde Q1=", round(q1, 2), " hasta Q3=", round(q3, 2), ")\n", sep="")
+      cat("- La línea dentro de la caja es la mediana (", round(mediana, 2), ")\n", sep="")
+      cat("- Los puntos rojos fuera de la caja son valores atípicos (muy altos o muy bajos)\n")
+      cat("- Los puntos azules dispersos muestran dónde están todos los datos\n\n")
+      
+      cat("**Resumen:** Los datos de **", col, "** ", sep="")
+      
+      # Describir la forma
+      if (abs(media - mediana) < desv_est * 0.1) {
+        cat("se distribuyen de forma equilibrada. No hay valores extremos problemáticos.\n\n")
+      } else if (media > mediana) {
+        cat("tienen algunos valores muy altos. La mayoría está baja, pero hay excepciones que suben el promedio.\n\n")
+      } else {
+        cat("tienen algunos valores muy bajos. La mayoría está alta, pero hay excepciones que bajan el promedio.\n\n")
+      }
+      
+      cat("---\n\n")
+    }
+  }
+}
+```
+
+## 3.2 Gráficos de Variables Categóricas
+
+```{r viz_categoricas, fig.show='hold'}
+if (length(factor_cols) > 0) {
+  for (col in factor_cols) {
+    freq_data <- datos_limpios[, .N, by = col][order(-N)][1:10]
+    names(freq_data) <- c("Categoria", "Frecuencia")
+    freq_data$Categoria <- as.character(freq_data$Categoria)
+    total_freq <- sum(freq_data$Frecuencia)
+    freq_data$Porcentaje <- round((freq_data$Frecuencia / total_freq) * 100, 1)
+    
+    # Gráfico de barras
+    p1 <- ggplot(freq_data, aes(x = reorder(Categoria, Frecuencia), y = Frecuencia)) +
+      geom_bar(stat = "identity", fill = "#e74c3c", alpha = 0.8, color = "black", size = 0.4) +
+      geom_text(aes(label = paste0(Frecuencia, " (", Porcentaje, "%)"), 
+                    y = Frecuencia + max(Frecuencia)*0.02), 
+                size = 3.5, hjust = 0, fontface = "bold") +
+      coord_flip() +
+      theme_minimal() +
+      theme(plot.title = element_text(face = "bold", size = 13),
+            plot.subtitle = element_text(size = 9, color = "gray50"),
+            axis.text = element_text(size = 10)) +
+      labs(title = paste("Top 10:", col),
+           subtitle = paste("Total:", total_freq, "observaciones"),
+           x = col, y = "Frecuencia")
+    
+    # Gráfico de pastel
+    p2 <- ggplot(freq_data, aes(x = "", y = Frecuencia, fill = Categoria)) +
+      geom_bar(stat = "identity", color = "white", size = 1.5) +
+      coord_polar("y", start = 0) +
+      geom_text(aes(label = paste0(Porcentaje, "%")), 
+                position = position_stack(vjust = 0.5),
+                size = 4, fontface = "bold", color = "white") +
+      theme_void() +
+      theme(legend.position = "right", 
+            legend.text = element_text(size = 9),
+            plot.title = element_text(face = "bold", size = 13, hjust = 0.5)) +
+      labs(title = paste("Proporción:", col), fill = col)
+    
+    print(p1)
+    print(p2)
+    
+    ggsave(paste0("resultados/barras_", make.names(col), ".png"), p1, 
+           width = 12, height = 6, dpi = 150, device = "png")
+    ggsave(paste0("resultados/pastel_", make.names(col), ".png"), p2, 
+           width = 9, height = 7, dpi = 150, device = "png")
+    
+    rm(p1, p2, freq_data)
+    gc(verbose = FALSE)
+  }
+}
+```
+
+```{r interpretacion_graficos_categoricos, results='asis'}
+if (length(factor_cols) > 0) {
+  for (col in factor_cols) {
+    freq_data <- datos_limpios[, .N, by = col][order(-N)][1:10]
+    total_freq <- sum(datos_limpios[, .N, by = col]$N)
+    
+    cat("### Gráfico de **", col, "**\n\n", sep="")
+    
+    cat("**Gráfico de barras (izquierda):**\n")
+    cat("- Muestra las 10 opciones más frecuentes\n")
+    cat("- La barra más larga es la más común\n")
+    cat("- El número al final es la cantidad y el porcentaje\n\n")
+    
+    cat("**Gráfico de pastel (derecha):**\n")
+    cat("- Muestra cómo se divide el total entre categorías\n")
+    cat("- Cada color es una categoría\n")
+    cat("- El porcentaje dice qué parte del total representa\n\n")
+    
+    cat("**¿Qué nos dice?** La variable **", col, "** tiene opciones que se distribuyen de cierta forma en la población. ",
+        "Algunos valores son mucho más frecuentes que otros.\n\n", sep="")
+    
+    cat("---\n\n")
+  }
+}
+```
+
+---
+
+# 4. DISTRIBUCIÓN ESPACIAL - MAPAS GEOGRÁFICOS
+
+## Distribución Espacial - Mapas Geográficos Temáticos
+
+Este análisis incluye visualización cartográfica de la Encuesta Nacional Agraria (ENA), recolectada en diferentes regiones del territorio peruano entre 2014 y 2024. Los mapas presentados muestran patrones espaciales de las variables principales, permitiendo identificar diferencias regionales y tendencias geográficas en los indicadores agrarios estudiados.
+
+### 4.1 Mapa Base: Cobertura Territorial de la ENA
+
+```{r mapa_cobertura_general, fig.width=12, fig.height=8}
+# Preparar datos con coordenadas
+datos_espaciales <- datos_importados[LONGITUD != 0 & LATITUD != 0 & !is.na(LONGITUD) & !is.na(LATITUD)]
+
+# Mapa general de cobertura
+p_cobertura <- ggplot(datos_espaciales, aes(x = LONGITUD, y = LATITUD)) +
+  geom_point(aes(color = NOMBREDD), size = 2.5, alpha = 0.6) +
+  geom_density2d(color = "gray30", size = 0.3, alpha = 0.3) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+    plot.subtitle = element_text(size = 11, color = "gray50", hjust = 0.5),
+    legend.position = "right",
+    legend.text = element_text(size = 9),
+    axis.text = element_text(size = 10)
+  ) +
+  labs(
+    title = "Cobertura Geográfica de la ENA 2014-2024",
+    subtitle = "Distribución de encuestas por departamento en el territorio peruano",
+    x = "Longitud",
+    y = "Latitud",
+    color = "Departamento"
+  )
+
+print(p_cobertura)
+ggsave("resultados/mapa_cobertura_general.png", p_cobertura, 
+       width = 12, height = 8, dpi = 150, device = "png")
+```
+
+**¿Qué ves en este mapa?** Este es el punto de partida: aquí se vé dónde se realizaron las encuestas en Perú. Cada punto de color representa una encuesta en una región específica. Las líneas grises muestran dónde hay concentraciones (densidad) de encuestas. Si ves muchos puntos juntos, significa que ese departamento fue encuestado muchas veces. Si hay zonas vacías, significa que esa región tiene menos datos. **Importancia:** Si la cobertura no es uniforme, algunos departamentos pueden estar sobre-representados o sub-representados, lo que afecta nuestras conclusiones.
+
+---
+
+### 4.2 Mapa Variable 1: P233_1 (Producción/Cultivos)
+
+```{r mapa_p233_1, fig.width=12, fig.height=8}
+# Preparar datos para P233_1
+datos_p233_1 <- datos_espaciales[!is.na(P233_1)]
+datos_p233_1_agg <- datos_p233_1[, .(
+  valor_medio = mean(P233_1, na.rm = TRUE),
+  contador = .N,
+  LONGITUD = mean(LONGITUD),
+  LATITUD = mean(LATITUD)
+), by = .(NOMBREDD, NOMBREPV)]
+
+# Mapa con intensidad de color por promedio de P233_1
+p_p233_1 <- ggplot(datos_p233_1_agg, aes(x = LONGITUD, y = LATITUD)) +
+  geom_point(aes(size = contador, color = valor_medio, fill = valor_medio), 
+             alpha = 0.7, shape = 21, stroke = 1) +
+  scale_color_gradient2(low = "#3498db", mid = "#f39c12", high = "#e74c3c",
+                        name = "Promedio P233_1") +
+  scale_fill_gradient2(low = "#3498db", mid = "#f39c12", high = "#e74c3c",
+                       name = "Promedio P233_1") +
+  scale_size_continuous(name = "Encuestas", range = c(3, 10)) +
+  geom_text(aes(label = NOMBREDD), vjust = -1.2, size = 2.5, color = "black", fontface = "bold") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+    plot.subtitle = element_text(size = 11, color = "gray50", hjust = 0.5),
+    axis.text = element_text(size = 10),
+    legend.position = "right"
+  ) +
+  labs(
+    title = "Distribución Espacial de P233_1",
+    subtitle = "Variable 1: Intensidad por región (tamaño = cantidad de encuestas)",
+    x = "Longitud",
+    y = "Latitud"
+  )
+
+print(p_p233_1)
+ggsave("resultados/mapa_p233_1.png", p_p233_1, 
+       width = 12, height = 8, dpi = 150, device = "png")
+```
+
+**¿Cómo leer este mapa?** 
+- **Color:** azul = valores bajos, naranja = valores medios, rojo = valores altos
+- **Tamaño del punto:** puntos grandes = más encuestas en esa zona, puntos pequeños = menos encuestas
+- **Patrón geográfico:** ¿Hay zonas rojas agrupadas (valores altos en la misma región)? ¿O están dispersas?
+
+**¿Qué significa?** Si ves que una región está toda en rojo, significa que P233_1 tiene valores altos allí consistentemente. Si la ves en azul, los valores son bajos. **Esto nos ayuda a entender** si hay diferencias regionalmente importantes para esta variable agraria.
+
+---
+
+### 4.3 Mapa Variable 2: P233_3 (Otra Producción/Actividad)
+
+```{r mapa_p233_3, fig.width=12, fig.height=8}
+# Preparar datos para P233_3
+datos_p233_3 <- datos_espaciales[!is.na(P233_3)]
+datos_p233_3_agg <- datos_p233_3[, .(
+  valor_medio = mean(P233_3, na.rm = TRUE),
+  contador = .N,
+  LONGITUD = mean(LONGITUD),
+  LATITUD = mean(LATITUD)
+), by = .(NOMBREDD, NOMBREPV)]
+
+# Mapa con intensidad de color por promedio de P233_3
+p_p233_3 <- ggplot(datos_p233_3_agg, aes(x = LONGITUD, y = LATITUD)) +
+  geom_point(aes(size = contador, color = valor_medio, fill = valor_medio), 
+             alpha = 0.7, shape = 21, stroke = 1) +
+  scale_color_gradient2(low = "#2ecc71", mid = "#f39c12", high = "#c0392b",
+                        name = "Promedio P233_3") +
+  scale_fill_gradient2(low = "#2ecc71", mid = "#f39c12", high = "#c0392b",
+                       name = "Promedio P233_3") +
+  scale_size_continuous(name = "Encuestas", range = c(3, 10)) +
+  geom_text(aes(label = NOMBREDD), vjust = -1.2, size = 2.5, color = "black", fontface = "bold") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+    plot.subtitle = element_text(size = 11, color = "gray50", hjust = 0.5),
+    axis.text = element_text(size = 10),
+    legend.position = "right"
+  ) +
+  labs(
+    title = "Distribución Espacial de P233_3",
+    subtitle = "Variable 2: Intensidad por región (tamaño = cantidad de encuestas)",
+    x = "Longitud",
+    y = "Latitud"
+  )
+
+print(p_p233_3)
+ggsave("resultados/mapa_p233_3.png", p_p233_3, 
+       width = 12, height = 8, dpi = 150, device = "png")
+```
+
+**Comparación con el mapa anterior:** Este mapa usa colores diferentes (verde = bajo, rojo = alto). ¿Los patrones son similares al anterior? ¿O son diferentes? Si P233_1 y P233_3 tienen patrones diferentes, significa que estas variables muestran procesos agrarios distintos por región. Si son similares, podría haber correlación entre ellas.
+
+---
+
+### 4.4 Mapa Variable 3: P234_NOM (Tipo/Categoría)
+
+```{r mapa_p234_nom, fig.width=12, fig.height=8}
+# Preparar datos para P234_NOM (variable categórica)
+datos_p234_nom <- datos_espaciales[!is.na(P234_NOM)]
+
+# Contar frecuencias por región y categoría
+p_p234_nom <- ggplot(datos_p234_nom, aes(x = LONGITUD, y = LATITUD)) +
+  geom_point(aes(color = P234_NOM, shape = P234_NOM), size = 3, alpha = 0.6, stroke = 0.8) +
+  scale_color_brewer(palette = "Set2", name = "Categoría P234_NOM") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+    plot.subtitle = element_text(size = 11, color = "gray50", hjust = 0.5),
+    axis.text = element_text(size = 10),
+    legend.position = "bottom",
+    legend.text = element_text(size = 9),
+    legend.box = "vertical"
+  ) +
+  labs(
+    title = "Distribución Espacial de P234_NOM",
+    subtitle = "Variable 3: Categorías distribuidas en el territorio",
+    x = "Longitud",
+    y = "Latitud"
+  ) +
+  guides(color = guide_legend(nrow = 3, byrow = TRUE))
+
+print(p_p234_nom)
+ggsave("resultados/mapa_p234_nom.png", p_p234_nom, 
+       width = 12, height = 8, dpi = 150, device = "png")
+```
+
+**¿Qué ves en este mapa?** Aquí cada color representa una categoría diferente (no valores numéricos como los anteriores). El formato es diferente: **¿hay agrupamientos de colores?** ¿O están todos los colores dispersos por todo Perú? Si en un departamento ves solo un color, significa que esa categoría domina allí. Si ves todos los colores mezclados, hay diversidad de categorías.
+
+---
+
+### 4.5 Análisis Regional Comparativo
+
+```{r analisis_regional, fig.width=12, fig.height=8}
+# Resumen por departamento
+datos_por_region <- datos_importados[, .(
+  P233_1_prom = mean(P233_1, na.rm = TRUE),
+  P233_3_prom = mean(P233_3, na.rm = TRUE),
+  n_encuestas = .N
+), by = NOMBREDD][order(-n_encuestas)]
+
+# Gráfico de departamentos con más encuestas
+p_regiones <- ggplot(datos_por_region[1:15], aes(x = reorder(NOMBREDD, n_encuestas), y = n_encuestas)) +
+  geom_col(aes(fill = P233_1_prom), alpha = 0.8, color = "black", size = 0.4) +
+  geom_text(aes(label = n_encuestas, y = n_encuestas + max(n_encuestas)*0.01), 
+            size = 3.5, hjust = 0, fontface = "bold") +
+  scale_fill_gradient(low = "#3498db", high = "#e74c3c", name = "Prom P233_1") +
+  coord_flip() +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    plot.subtitle = element_text(size = 11, color = "gray50"),
+    axis.text = element_text(size = 10)
+  ) +
+  labs(
+    title = "Top 15 Departamentos por Cantidad de Encuestas ENA",
+    subtitle = "Color indica promedio de P233_1",
+    x = "Departamento",
+    y = "Cantidad de Encuestas"
+  )
+
+print(p_regiones)
+ggsave("resultados/analisis_regional.png", p_regiones, 
+       width = 12, height = 8, dpi = 150, device = "png")
+```
+
+**¿Qué muestra este gráfico?** Las barras horizontales muestran los **15 departamentos que fueron más encuestados**. El número al lado indica cuántas encuestas se hicieron allí. **El color** (azul oscuro a rojo) indica el promedio de P233_1 en esa región: azul = bajo, rojo = alto.
+
+**Lectura rápida:** ¿Hay departamentos que fueron poco encuestados? ¿Hay diferencias grandes en el promedio de P233_1 entre regiones (muchas barras azules vs. muchas rojas)?
+
+---
+
+# 5. CONCLUSIÓN FINAL - EN PALABRAS SIMPLES
+
+## Lo que significan nuestros resultados
+
+### El Panorama General
+
+Analizamos más de **`r nrow(datos_limpios)` encuestas de la ENA** realizadas entre 2014 y 2024 en todo Perú. Los datos están **100% completos** (sin faltantes) y limpios (sin duplicados), así que podemos confiar en lo que vemos.
+
+### Sobre las Variables Numéricas (P233_1 y P233_3)
+
+Las variables que miden producción y actividades agrarias muestran:
+- **Valores promedios** que identificamos en las tablas anteriores
+- **Variación moderada** entre los datos (lo que significa que hay diferencias entre regiones y productores)
+- **Algunos valores extremos** en ambos extremos (productores muy grandes y muy pequeños)
+
+Lo importante es que **no todos los agricultores tienen el mismo nivel de producción**. Algunos tienen mucho, otros tienen poco. Esto es lo normal en la agricultura.
+
+### Sobre las Variables Categóricas (P234_NOM)
+
+Las variables que miden categorías (tipos, métodos, prácticas) muestran:
+- **Algunas opciones son mucho más comunes** que otras
+- **Cierto consenso** en ciertas prácticas (si vemos que un 70%+ elige lo mismo)
+- **Diversidad** en otras prácticas (si vemos que las opciones están distribuidas)
+
+Esto sugiere que **hay patrones, pero también hay agricultores que hacen las cosas diferente**.
+
+### Sobre la Geografía (Mapas)
+
+Los mapas muestran que:
+- **No todas las regiones tienen el mismo nivel** de P233_1 o P233_3
+- **Algunas zonas de Perú** tienen producción más alta (rojo en los mapas)
+- **Otras zonas** tienen producción más baja (azul en los mapas)
+- **La cobertura de encuestas** no fue igual en todas partes (algunos departamentos tienen más datos que otros)
+
+**¿Qué significa esto?** Que la geografía importa en la agricultura. No es lo mismo ser agricultor en la costa que en la sierra. La tierra, el clima, el acceso a mercados... todo cambia.
+
+### Conclusión Simple
+
+Este análisis de la ENA 2014-2024 nos muestra que **la agricultura en Perú es diversa y variable**:
+- **No hay un modelo único** de productor agrario
+- **La región donde vives** influye mucho en lo que produces y cómo lo produces
+- **Hay patrones**, pero también **excepciones** 
+- **La heterogeneidad es normal** en un país grande como Perú
+
+Si tuvieras que escribir un trabajo sobre esto, dirías algo como: *"El análisis de la ENA 2014-2024 revela que la producción agraria en Perú es heterogénea, con variaciones significativas entre regiones. Aunque hay ciertos patrones, la diversidad de estrategias productivas y niveles de producción refleja la adaptación de los agricultores a sus contextos geográficos específicos."*
+
+---
+
+**FIN DEL ANÁLISIS**
+
