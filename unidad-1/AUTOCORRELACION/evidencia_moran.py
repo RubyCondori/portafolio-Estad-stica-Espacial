@@ -286,7 +286,7 @@ def generar_grafico_moran(x, W, var_name, output_path="moran_scatterplot.png"):
     plt.xlabel("Valor Estandarizado (z)", fontsize=9, labelpad=8)
     plt.ylabel("Lag Espacial Estandarizado (wz)", fontsize=9, labelpad=8)
     plt.grid(True, linestyle=':', alpha=0.1)
-    plt.legend(loc="upper left", frameon=True, facecolor='#101428', edgecolor='rgba(255,255,255,0.1)')
+    plt.legend(loc="upper left", frameon=True, facecolor='#101428', edgecolor=(1.0, 1.0, 1.0, 0.1))
     
     # Agregar zonas de los cuadrantes
     plt.text(plt.xlim()[1] * 0.9, plt.ylim()[1] * 0.8, "Alto-Alto\n(Hotspot)", color='#ff4757', fontsize=8, ha='right')
