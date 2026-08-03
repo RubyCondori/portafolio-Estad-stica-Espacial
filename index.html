@@ -122,17 +122,23 @@
                 <div class="trabajo-card fade-in">
                     <div class="trabajo-header">
                         <span class="trabajo-numero">Trabajo 1.1</span>
-                        <span class="trabajo-tag">FUNDAMENTAL</span>
+                        <span class="trabajo-tag">VECTORES & SHAPES</span>
                     </div>
                     <h3>Análisis Estadístico Espacial ENA 2014-2024</h3>
                     <p class="trabajo-descripcion">
                         Análisis estadístico espacial completo de la Encuesta Nacional Agraria. Incluye análisis descriptivo, visualizaciones temáticas, mapas de cobertura territorial y distribución espacial de variables agrarias.
                     </p>
                     <div class="trabajo-recursos">
-                        <button class="btn-recurso btn-pdf" onclick="abrirPDF('unidad-1/TRABAJO_1/Analisis_ENA_2014_2024.html')">
-                            <i class="fas fa-file-pdf"></i> Ver Análisis
+                        <button class="btn-recurso btn-pdf" onclick="window.open('unidad-1/Vectores & Shapes/Analisis_ENA_2014_2024.html', '_blank')">
+                            <i class="fas fa-file-code"></i> Ver Análisis HTML
                         </button>
-                        <button class="btn-recurso btn-descargar" onclick="descargarPDF('unidad-1/TRABAJO_1/Analisis-ENA-Completo.zip', 'Analisis-ENA-Completo.zip')">
+                        <button class="btn-recurso btn-pdf" onclick="abrirPDF('unidad-1/Vectores & Shapes/Analisis_ENA_2014_2024.pdf')">
+                            <i class="fas fa-file-pdf"></i> Ver PDF
+                        </button>
+                        <button class="btn-recurso btn-descargar" onclick="descargarPDF('unidad-1/Vectores & Shapes/Analisis_ENA_2014_2024..Rmd', 'Analisis_ENA_2014_2024.Rmd')">
+                            <i class="fab fa-r-project"></i> Código Rmd
+                        </button>
+                        <button class="btn-recurso btn-descargar" onclick="descargarPDF('unidad-1/Vectores & Shapes/Analisis-ENA-Completo.zip', 'Analisis-ENA-Completo.zip')">
                             <i class="fas fa-download"></i> Descargar Completo
                         </button>
                     </div>
@@ -152,6 +158,83 @@
                         <button class="btn-recurso btn-pdf" onclick="window.open('unidad-1/AUTOCORRELACION/index.html', '_blank')">
                             <i class="fas fa-external-link-alt"></i> Abrir Aplicativo
                         </button>
+                        <button class="btn-recurso btn-descargar" onclick="descargarPDF('unidad-1/AUTOCORRELACION/evidencia_moran.py', 'evidencia_moran.py')">
+                            <i class="fab fa-python"></i> Script Python
+                        </button>
+                        <button class="btn-recurso btn-pdf" onclick="abrirPDF('unidad-1/AUTOCORRELACION/moran_cacao_1896.png')">
+                            <i class="fas fa-chart-bar"></i> Gráfico Cacao
+                        </button>
+                        <button class="btn-recurso btn-pdf" onclick="abrirPDF('unidad-1/AUTOCORRELACION/moran_pastos_1895.png')">
+                            <i class="fas fa-chart-line"></i> Gráfico Pastos
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Trabajo 1.3 -->
+                <div class="trabajo-card fade-in">
+                    <div class="trabajo-header">
+                        <span class="trabajo-numero">Trabajo 1.3</span>
+                        <span class="trabajo-tag">JENKS</span>
+                    </div>
+                    <h3>Intervalos de Pisos Altitudinales</h3>
+                    <p class="trabajo-descripcion">
+                        Cálculo de intervalos de pisos altitudinales y análisis sobre datos de la Encuesta Nacional Agraria (ENA).
+                    </p>
+                    <div class="trabajo-recursos">
+                        <button class="btn-recurso btn-pdf" onclick="abrirPDF('unidad-1/Intervalos de Pisos Altitudinales/JENKS-ENA.pdf')">
+                            <i class="fas fa-file-pdf"></i> Ver Documento
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Trabajo 1.4 -->
+                <div class="trabajo-card fade-in">
+                    <div class="trabajo-header">
+                        <span class="trabajo-numero">Trabajo 1.4</span>
+                        <span class="trabajo-tag">ANÁLISIS</span>
+                    </div>
+                    <h3>Ubicación Espacial ENA 2014-2024</h3>
+                    <p class="trabajo-descripcion">
+                        Documento con análisis sobre la ubicación espacial de las variables de la ENA.
+                    </p>
+                    <div class="trabajo-recursos">
+                        <button class="btn-recurso btn-pdf" onclick="abrirPDF('unidad-1/Ubicación Espacial/Analisis_ENA_2014_2024.pdf')">
+                            <i class="fas fa-file-pdf"></i> Ver Documento
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Trabajo 1.5 -->
+                <div class="trabajo-card fade-in">
+                    <div class="trabajo-header">
+                        <span class="trabajo-numero">Trabajo 1.5</span>
+                        <span class="trabajo-tag">PAPER</span>
+                    </div>
+                    <h3>Submisión Paper V1 - Artículo Quinua</h3>
+                    <p class="trabajo-descripcion">
+                        Borrador de artículo de investigación relacionado al estudio de la Quinua.
+                    </p>
+                    <div class="trabajo-recursos">
+                        <button class="btn-recurso btn-pdf" onclick="abrirPDF('unidad-1/Submisión Paper V1/article_quinua.pdf')">
+                            <i class="fas fa-file-pdf"></i> Ver Paper
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Trabajo 1.6 -->
+                <div class="trabajo-card fade-in">
+                    <div class="trabajo-header">
+                        <span class="trabajo-numero">Trabajo 1.6</span>
+                        <span class="trabajo-tag">PIPELINE</span>
+                    </div>
+                    <h3>Pipeline</h3>
+                    <p class="trabajo-descripcion">
+                        Documentación y estructura de pipeline para el procesamiento de datos y modelado.
+                    </p>
+                    <div class="trabajo-recursos">
+                        <button class="btn-recurso btn-pdf" onclick="abrirPDF('unidad-1/pipeline/https.pdf')">
+                            <i class="fas fa-file-pdf"></i> Ver Documento
+                        </button>
                     </div>
                 </div>
             </div>
@@ -165,7 +248,56 @@
             <p class="section-subtitle">Trabajos académicos de la Unidad II</p>
 
             <div class="trabajos-grid">
-                
+                <!-- Trabajo 2.1 -->
+                <div class="trabajo-card fade-in">
+                    <div class="trabajo-header">
+                        <span class="trabajo-numero">Trabajo 2.1</span>
+                        <span class="trabajo-tag">AUTOCORRELACIÓN</span>
+                    </div>
+                    <h3>Autocorrelación Espacial (IMoran)</h3>
+                    <p class="trabajo-descripcion">
+                        Análisis del Índice de Moran para evaluar la autocorrelación espacial de diversas variables.
+                    </p>
+                    <div class="trabajo-recursos">
+                        <button class="btn-recurso btn-pdf" onclick="abrirPDF('unidad-2/Autocorrelación ( IMoran)/MORAN.pdf.pdf')">
+                            <i class="fas fa-file-pdf"></i> Ver Análisis
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Trabajo 2.2 -->
+                <div class="trabajo-card fade-in">
+                    <div class="trabajo-header">
+                        <span class="trabajo-numero">Trabajo 2.2</span>
+                        <span class="trabajo-tag">REPLICACIÓN</span>
+                    </div>
+                    <h3>Replicación de Herramientas: Calidad del Aire</h3>
+                    <p class="trabajo-descripcion">
+                        Análisis Temporal y Espacial de la Calidad del Aire Determinado por Material Particulado.
+                    </p>
+                    <div class="trabajo-recursos">
+                        <button class="btn-recurso btn-pdf" onclick="abrirPDF('unidad-2/Replicación de Herramientas/Análisis_Temporal_y_Espacial_de_la_Calidad_del_Aire_Determinado_por_Material_Particu.pdf')">
+                            <i class="fas fa-file-pdf"></i> Ver Documento
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Trabajo 2.3 -->
+                <div class="trabajo-card fade-in">
+                    <div class="trabajo-header">
+                        <span class="trabajo-numero">Trabajo 2.3</span>
+                        <span class="trabajo-tag">PROYECTO</span>
+                    </div>
+                    <h3>Integración de Índices de Vegetación y Estadística Espacial en la Región Puno</h3>
+                    <p class="trabajo-descripcion">
+                        Análisis de índices de vegetación e integración con métodos de estadística espacial.
+                    </p>
+                    <div class="trabajo-recursos">
+                        <button class="btn-recurso btn-pdf" onclick="abrirPDF('unidad-2/Integración de Índices de Vegetación y Estadística Espacial en la Región Puno/Integración_de_índices_de_vegetación_y_estadística_espacial_para_caracterizar_la_cob.pdf')">
+                            <i class="fas fa-file-pdf"></i> Ver Documento
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
